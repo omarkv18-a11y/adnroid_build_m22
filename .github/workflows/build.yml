@@ -1,0 +1,44 @@
+name: Build TWRP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up environment
+        run: |
+          sudo apt update
+          sudo apt install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache libgl1-mesa-dev libxml2-utils xsltproc unzip python3
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          export PATH=~/bin:$PATH
+
+      - name: Initialize Repo
+        run: |
+          mkdir ~/twrp && cd ~/twrp
+          repo init -u https://github.com/omnirom/android.git -b android-11
+          repo sync -c -j$(nproc) --force-sync
+
+      - name: Add Device Tree
+        run: |
+          mkdir -p ~/twrp/device/samsung/m22
+          cp -r $GITHUB_WORKSPACE/device/samsung/m22/* ~/twrp/device/samsung/m22/
+
+      - name: Build
+        run: |
+          cd ~/twrp
+          source build/envsetup.sh
+          lunch omni_m22-eng
+          mka recoveryimage
+
+      - name: Upload Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: twrp-m22
+          path: ~/twrp/out/target/product/m22/recovery.img
